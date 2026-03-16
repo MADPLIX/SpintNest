@@ -1,8 +1,9 @@
 # SprintNest
 
-Eine Desktop-Anwendung für Scrum-Projektplanung mit täglichem Arbeitsprotokoll und PDF-Export.
+SprintNest ist eine Desktop-Anwendung für agiles Projektmanagement nach der Scrum-Methode. 
+Entwickelt für Teams und Einzelpersonen die ihre Projekte strukturiert planen und dokumentieren möchten.
 
-## Funktionen
+## Features
 
 - **Projekte** – Projekte anlegen, bearbeiten, archivieren und löschen
 - **Scrum Board** – Kanban-Board mit Drag & Drop (Backlog, To Do, In Progress, Review, Done)
@@ -10,60 +11,22 @@ Eine Desktop-Anwendung für Scrum-Projektplanung mit täglichem Arbeitsprotokoll
 - **Sprints** – Sprint-Planung mit Start, Ende und Ziel
 - **Arbeitsprotokoll** – Tägliche Einträge mit Screenshot-Upload
 - **PDF-Export** – Projektplan und Arbeitsprotokoll als PDF exportieren
-- **Daten-Export** – JSON- und CSV-Export für Backup und Auswertung
-
-## Voraussetzungen
-
-- **Node.js** (v18+)
-- **Rust** (für Tauri) – [rustup.rs](https://rustup.rs)
-- **Windows:** Visual Studio Build Tools mit C++-Workload
+- **Daten-Export** – JSON- und CSV-Export für Backup und Auswertung sowie Google Drive Sync
 
 ## Installation
 
-```bash
-cd scrum-planner
-npm install
-```
+1. Lade den neuesten Installer von der [Releases](https://github.com/MADPLIX/SpintNest/releases) Seite herunter
+2. Führe die `.exe` Datei aus
+3. Folge den Installationsanweisungen
+4. SprintNest aktualisiert sich automatisch sobald eine neue Version verfügbar ist
 
-## Entwicklung
+## Technologien
 
-```bash
-npm run tauri:dev
-```
+- [Tauri](https://tauri.app/) – Desktop Framework
+- [TypeScript](https://www.typescriptlang.org/) – Programmiersprache
+- [Vite](https://vitejs.dev/) – Build Tool
 
-Startet die Tauri-App mit Hot-Reload. Das Vite-Frontend und die Rust-Backend werden automatisch neu geladen.
+## Lizenz
 
-## Build
-
-```bash
-npm run tauri:build
-```
-
-Erstellt eine installierbare Anwendung im Ordner `src-tauri/target/release/bundle/`.
-
-## Nur Frontend (ohne Tauri)
-
-```bash
-npm run dev    # Entwicklung
-npm run build  # Produktions-Build
-```
-
-Hinweis: Ohne Tauri funktionieren die Datenpersistenz und native Dialoge nicht – die App benötigt Tauri für den vollen Funktionsumfang.
-
-## Technologie-Stack
-
-- **Tauri 2** – Desktop-Framework
-- **React 19 + TypeScript + Vite**
-- **Tailwind CSS**
-- **Zustand** – State Management
-- **@dnd-kit** – Drag & Drop
-- **jspdf + jspdf-autotable** – PDF-Export
-
-## Datenspeicherung
-
-Daten werden lokal in `data.json` im App-Datenordner gespeichert:
-- **Windows:** `%APPDATA%/com.sprintnest.app/`
-- **macOS:** `~/Library/Application Support/com.tauri.dev/`
-- **Linux:** `~/.config/com.tauri.dev/`
-
-Automatische Backups werden täglich im Unterordner `backups/` erstellt.
+Dieses Projekt steht unter der [Elastic License 2.0](LICENSE).  
+© 2026 Dominic Vanella
