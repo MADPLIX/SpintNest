@@ -25,7 +25,7 @@ export function About() {
       </p>
       <div className="space-y-2 text-sm text-[var(--color-text-muted)]">
         <p><span className="font-medium text-[var(--color-text-dim)]">Entwickelt von</span> MADPLIX</p>
-        <p><span className="font-medium text-[var(--color-text-dim)]">Lizenz</span> MIT-Lizenz</p>
+        <p><span className="font-medium text-[var(--color-text-dim)]">Lizenz</span> Elastic License 2.0</p>
       </div>
       <div className="pt-4 border-t border-[var(--color-border)] text-sm text-[var(--color-text-dim)]">
         © {new Date().getFullYear()} MADPLIX
