@@ -3,8 +3,6 @@
 SprintNest ist eine Desktop-Anwendung für agiles Projektmanagement nach der Scrum-Methode. 
 Entwickelt für Teams und Einzelpersonen die ihre Projekte strukturiert planen und dokumentieren möchten.
 
-aktuelleste version [hier](https://github.com/MADPLIX/SpintNest/releases) runterladen
-
 ## Features
 
 - **Projekte** – Projekte anlegen, bearbeiten, archivieren und löschen
