@@ -1,0 +1,8 @@
+---
+description: Nach jeder Code-Änderung einen Build ausführen
+alwaysApply: true
+---
+
+# Build nach Änderungen
+
+Nach jeder Änderung am Code einen Build ausführen (`npm run build` oder `npm run tauri:build`).
