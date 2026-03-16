@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { check, type Update } from '@tauri-apps/plugin-updater';
+import { invoke } from '@tauri-apps/api/core';
 import { useStore } from '../store/useStore';
+
+const MANUAL_DOWNLOAD_URL = 'https://sn.madplix.de/download';
 
 export function UpdateNotification() {
   const {
@@ -32,6 +35,8 @@ export function UpdateNotification() {
 
   if (!updateAvailable) return null;
 
+  const isSignatureError = error?.toLowerCase().includes('signature') ?? false;
+
   async function handleInstall() {
     if (!pendingUpdate) return;
     setError(null);
@@ -42,6 +47,10 @@ export function UpdateNotification() {
       setError(String(e));
       setUpdateInstalling(false);
     }
+  }
+
+  function handleManualDownload() {
+    invoke('open_url', { url: MANUAL_DOWNLOAD_URL });
   }
 
   return (
@@ -84,7 +93,21 @@ export function UpdateNotification() {
       )}
 
       {error && (
-        <div className="px-4 pb-2 text-xs text-[var(--color-danger)]">{error}</div>
+        <div className="px-4 pb-2 space-y-2">
+          <p className="text-xs text-[var(--color-danger)]">{error}</p>
+          {isSignatureError && (
+            <p className="text-xs text-[var(--color-text-muted)]">
+              Nach einem Schlüsselwechsel muss die neue Version einmal manuell heruntergeladen werden.{' '}
+              <button
+                type="button"
+                onClick={handleManualDownload}
+                className="text-[var(--color-accent)] hover:underline font-medium"
+              >
+                Jetzt herunterladen
+              </button>
+            </p>
+          )}
+        </div>
       )}
 
       <div className="flex gap-2 px-4 pb-4">
