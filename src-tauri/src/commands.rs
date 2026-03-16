@@ -627,7 +627,7 @@ pub fn import_backup(app: tauri::AppHandle, input: ImportBackupInput) -> Result<
     Ok(new_project)
 }
 
-fn gdrive_tokens_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+fn gdrive_tokens_path(_app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
     Ok(db::app_data_dir().map_err(|e| e.to_string())?.join("gdrive_tokens.json"))
 }
 

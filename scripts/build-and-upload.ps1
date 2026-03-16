@@ -1,49 +1,49 @@
-# SprintNest Build & Upload Script
-# Wenn Signing fehlschlägt, bricht das Script mit einem Fehler ab.
-
-param(
-    [string]$Notes = "Neue Version"
-)
+# SprintNest Build Script (nur signierte Versionen, kein Upload)
 
 $ErrorActionPreference = "Stop"
-$projectDir = $PSScriptRoot
-$envPath = Join-Path $PSScriptRoot ".env"
+$projectDir = Split-Path $PSScriptRoot -Parent
+$envPath = Join-Path $projectDir ".env"
+$keyPath = Join-Path $projectDir "..\Sprintnestkey\sprintnest_new.key"
 
-# 1. .env laden
+# 1. .env laden (Werte getrimmt, Anführungszeichen entfernt)
 Write-Host "Lade .env..." -ForegroundColor Cyan
 if (-not (Test-Path $envPath)) {
-    Write-Error "FEHLER: .env nicht gefunden unter $envPath — Abbruch."
+    Write-Error "FEHLER: .env nicht gefunden unter $envPath - Abbruch."
     exit 1
 }
-Get-Content $envPath | ForEach-Object {
-    if ($_ -match "^(.+?)=(.+)$") {
-        [System.Environment]::SetEnvironmentVariable($matches[1], $matches[2].Trim())
+$content = Get-Content $envPath -Raw -Encoding UTF8
+$content = $content.TrimStart([char]0xFEFF)
+foreach ($line in ($content -split '\r?\n')) {
+    if ($line -match '^\s*#' -or $line -match '^\s*$') { continue }
+    if ($line -match '^\s*([^=]+)=(.*)$') {
+        $key = $matches[1].Trim()
+        $value = $matches[2].Trim()
+        if (($value.StartsWith('"') -and $value.EndsWith('"')) -or ($value.StartsWith("'") -and $value.EndsWith("'"))) {
+            $value = $value.Substring(1, $value.Length - 2)
+        }
+        [System.Environment]::SetEnvironmentVariable($key, $value)
     }
 }
 
-# 2. Signing Keys setzen
-$env:TAURI_SIGNING_PRIVATE_KEY = $env:TAURI_PRIVATE_KEY
-$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = $env:TAURI_KEY_PASSWORD
-
-if (-not $env:TAURI_SIGNING_PRIVATE_KEY) {
-    Write-Error "FEHLER: TAURI_PRIVATE_KEY nicht in .env gefunden — Abbruch."
-    exit 1
-}
-if (-not $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD) {
-    Write-Error "FEHLER: TAURI_KEY_PASSWORD nicht in .env gefunden — Abbruch."
-    exit 1
-}
-if (-not $env:UPLOAD_TOKEN) {
-    Write-Error "FEHLER: UPLOAD_TOKEN nicht in .env gefunden — Abbruch."
+# 2. Prüfungen
+if (-not (Test-Path $keyPath)) {
+    Write-Error "FEHLER: Key nicht gefunden unter $keyPath - Abbruch."
     exit 1
 }
 
-# 3. Build starten
+# 3. Passwort abfragen (wird direkt übergeben, kein .env)
+$securePassword = Read-Host "Passwort für Signing-Key" -AsSecureString
+$BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword)
+$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
+[System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($BSTR)
+
+# 4. Build starten (Node-Wrapper umgeht cmd.exe – Credentials werden korrekt übergeben)
 Write-Host "Starte Build..." -ForegroundColor Cyan
 Set-Location $projectDir
-npm run tauri:build
+node scripts/tauri-build-with-signing.js
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-# 4. Version und Pfade ermitteln
+# 5. Version und Pfade ermitteln
 $version = (Get-Content "package.json" | ConvertFrom-Json).version
 $nsisDir = "src-tauri\target\release\bundle\nsis"
 $zipPath = "$nsisDir\SprintNest_${version}_x64-setup.nsis.zip"
@@ -56,31 +56,14 @@ if (Test-Path "$zipPath.sig") {
     $installerPath = $exePath
     $sigPath = "$exePath.sig"
 } else {
-    Write-Error "FEHLER: Keine .sig-Datei gefunden. Signing fehlgeschlagen — Abbruch."
+    Write-Error "FEHLER: Keine .sig-Datei gefunden. Signing fehlgeschlagen - Abbruch."
     exit 1
 }
 if (-not (Test-Path $installerPath)) {
-    Write-Error "FEHLER: Installer nicht gefunden: $installerPath — Abbruch."
+    Write-Error "FEHLER: Installer nicht gefunden: $installerPath - Abbruch."
     exit 1
 }
 
 $sig = (Get-Content $sigPath -Raw).Trim()
 Write-Host "Signatur OK ($installerPath)." -ForegroundColor Green
-
-# 5. Hochladen
-Write-Host "Lade Release $version hoch..." -ForegroundColor Cyan
-$result = curl.exe -s -X POST `
-    -H "Authorization: Bearer $env:UPLOAD_TOKEN" `
-    -F "version=$version" `
-    -F "notes=$Notes" `
-    -F "platform=x86_64-pc-windows-msvc" `
-    -F "signature=$sig" `
-    -F "installer=@$installerPath" `
-    $env:RELEASE_ENDPOINT
-
-if ($result -match '"ok":true') {
-    Write-Host "Erfolgreich hochgeladen: Version $version" -ForegroundColor Green
-} else {
-    Write-Error ("FEHLER: Upload fehlgeschlagen: " + $result)
-    exit 1
-}
+Write-Host "Build abgeschlossen: Version $version" -ForegroundColor Green

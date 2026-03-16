@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "SprintNest",
-  "version": "0.4.5",
+  "version": "0.5.1",
   "identifier": "com.sprintnest.app",
   "build": {
     "frontendDist": "../dist",
@@ -39,7 +39,7 @@
         "https://sn.madplix.de/update/{{target}}/{{current_version}}"
       ],
       "dialog": false,
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDVGQUQ2Mjk2RUQyNzlEMjYKUldRbW5TZnRsbUt0WCtDNzBoV1cwM1FZNmyBbUsyL0dvRW5YOENJd2o3b2RuNGsvQjFJMWdSSVEK"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEFFNzY4QUZBRTNBMjRFMTkKUldRWlRxTGorb3Aycm5iNUdmUG1pTk1reDk2MGZaem1SeExMTkJQZzhVRCtCZ0J4ZFVsd2NoeSsK"
     }
   },
   "bundle": {
