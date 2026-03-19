@@ -24,6 +24,18 @@ const IN_PROGRESS_COLOR = '#14b8a6';
 const REVIEW_COLOR = '#8b5cf6';
 const DONE_COLOR = '#22c55e';
 
+/** Frühestes Fälligkeitsdatum oben; Tasks ohne Datum zuletzt (alphabetisch nach Titel). */
+function sortTasksByDueDate(tasks: Task[]): Task[] {
+  return [...tasks].sort((a, b) => {
+    const da = a.faellig_am?.trim();
+    const db = b.faellig_am?.trim();
+    if (da && db) return da.localeCompare(db);
+    if (da && !db) return -1;
+    if (!da && db) return 1;
+    return a.titel.localeCompare(b.titel, undefined, { sensitivity: 'base' });
+  });
+}
+
 export function Board() {
   const selectedProjectId = useStore((s) => s.selectedProjectId);
   const [project, setProject] = useState<Project | null>(null);
@@ -219,17 +231,20 @@ export function Board() {
     }
   }
 
-  const backlogTasks = tasks.filter(
-    (t) => !t.sprint_id && (t.status === 'Backlog' || t.status === 'To Do')
+  const backlogTasks = sortTasksByDueDate(
+    tasks.filter((t) => !t.sprint_id && (t.status === 'Backlog' || t.status === 'To Do'))
   );
-  const inProgressTasks = tasks.filter((t) => t.status === 'In Progress');
-  const reviewTasks = tasks.filter((t) => t.status === 'Review');
+  const inProgressTasks = sortTasksByDueDate(tasks.filter((t) => t.status === 'In Progress'));
+  const reviewTasks = sortTasksByDueDate(tasks.filter((t) => t.status === 'Review'));
+  /** Erledigt: nicht nach Fälligkeit sortieren – Reihenfolge wie geladen (chronologisch/natürlich). */
   const doneTasks = tasks.filter((t) => t.status === 'Done');
   const sprintTasksMap = new Map<string, Task[]>();
   for (const s of sprints) {
     sprintTasksMap.set(
       s.id,
-      tasks.filter((t) => t.sprint_id === s.id && (t.status === 'To Do' || t.status === 'Backlog'))
+      sortTasksByDueDate(
+        tasks.filter((t) => t.sprint_id === s.id && (t.status === 'To Do' || t.status === 'Backlog'))
+      )
     );
   }
 
