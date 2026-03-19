@@ -1,6 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { check, type Update } from '@tauri-apps/plugin-updater';
 import { invoke } from '@tauri-apps/api/core';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import type { Components } from 'react-markdown';
 import { useStore } from '../store/useStore';
 
 const MANUAL_DOWNLOAD_URL = 'https://sn.madplix.de/download';
@@ -19,6 +22,27 @@ export function UpdateNotification() {
   const [expanded, setExpanded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingUpdate, setPendingUpdate] = useState<Update | null>(null);
+
+  const markdownComponents = useMemo<Components>(
+    () => ({
+      a: ({ href, children, ...props }) => (
+        <a
+          {...props}
+          href={href}
+          className="text-[var(--color-accent)] hover:underline break-words cursor-pointer"
+          onClick={(e) => {
+            if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
+              e.preventDefault();
+              void invoke('open_url', { url: href });
+            }
+          }}
+        >
+          {children}
+        </a>
+      ),
+    }),
+    []
+  );
 
   useEffect(() => {
     check()
@@ -85,9 +109,24 @@ export function UpdateNotification() {
             {expanded ? 'Weniger anzeigen' : 'Was ist neu?'}
           </button>
           {expanded && (
-            <p className="mt-1 max-h-32 overflow-y-auto whitespace-pre-wrap text-xs text-[var(--color-text-muted)]">
-              {updateNotes}
-            </p>
+            <div
+              className="mt-1 max-h-32 overflow-y-auto text-xs text-[var(--color-text-muted)]
+                [&_p]:my-1.5 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0
+                [&_ul]:my-1.5 [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:space-y-0.5
+                [&_ol]:my-1.5 [&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:space-y-0.5
+                [&_li]:pl-0.5
+                [&_h1]:text-sm [&_h1]:font-semibold [&_h1]:text-[var(--color-text)] [&_h1]:mt-2 [&_h1]:mb-1
+                [&_h2]:text-xs [&_h2]:font-semibold [&_h2]:text-[var(--color-text)] [&_h2]:mt-2 [&_h2]:mb-1
+                [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:text-[var(--color-text)] [&_h3]:mt-2 [&_h3]:mb-1
+                [&_strong]:font-semibold [&_strong]:text-[var(--color-text)]
+                [&_code]:rounded [&_code]:bg-[var(--color-bg-card)] [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[11px]
+                [&_pre]:my-1.5 [&_pre]:max-w-full [&_pre]:overflow-x-auto [&_pre]:rounded [&_pre]:bg-[var(--color-bg-card)] [&_pre]:p-2
+                [&_blockquote]:border-l-2 [&_blockquote]:border-[var(--color-border)] [&_blockquote]:pl-2 [&_blockquote]:italic"
+            >
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                {updateNotes}
+              </ReactMarkdown>
+            </div>
           )}
         </div>
       )}
