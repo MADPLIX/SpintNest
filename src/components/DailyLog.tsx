@@ -51,12 +51,15 @@ export function DailyLog() {
   }
 
   async function loadLogs() {
+    if (!selectedProjectId) {
+      setLogs([]);
+      setEntry('');
+      setScreenshots([]);
+      setLinkedTaskIds([]);
+      return;
+    }
     try {
-      const data = await api.dailyLogs.getAll(
-        selectedProjectId || undefined,
-        selectedDate,
-        selectedDate
-      );
+      const data = await api.dailyLogs.getAll(selectedProjectId, selectedDate, selectedDate);
       setLogs(data);
       const todayLog = data.find((l) => l.datum === selectedDate);
       if (todayLog) {

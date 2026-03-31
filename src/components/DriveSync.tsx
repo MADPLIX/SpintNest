@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
 import * as gdrive from '../lib/gdrive';
+import {
+  GDRIVE_AUTOSYNC_STORAGE_KEY,
+  isGdriveAutosyncEnabled,
+  setGdriveAutosyncEnabled,
+} from '../lib/gdriveAutoSync';
+import { ConfirmModal } from './ConfirmModal';
 
 export function DriveSync() {
   const showAlert = useStore((s) => s.showAlert);
@@ -9,6 +15,8 @@ export function DriveSync() {
   const [connecting, setConnecting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<string | null>(localStorage.getItem('sn_gdrive_last_sync'));
+  const [autosync, setAutosync] = useState(() => isGdriveAutosyncEnabled());
+  const [pullConfirmOpen, setPullConfirmOpen] = useState(false);
 
   useEffect(() => {
     gdrive.isConnected().then(setConnected);
@@ -20,11 +28,19 @@ export function DriveSync() {
     setLastSync(now);
   }
 
+  function persistAutosync(on: boolean) {
+    setGdriveAutosyncEnabled(on);
+    setAutosync(on);
+  }
+
   async function handleConnect() {
     setConnecting(true);
     try {
       await gdrive.connect();
       setConnected(true);
+      if (localStorage.getItem(GDRIVE_AUTOSYNC_STORAGE_KEY) === null) {
+        persistAutosync(true);
+      }
       showAlert('Google Drive erfolgreich verbunden!', 'success');
     } catch (e) {
       showAlert('Verbindung fehlgeschlagen: ' + String(e), 'error');
@@ -46,7 +62,8 @@ export function DriveSync() {
     }
   }
 
-  async function handlePull() {
+  async function runPull() {
+    setPullConfirmOpen(false);
     setSyncing(true);
     try {
       await gdrive.pull();
@@ -97,6 +114,21 @@ export function DriveSync() {
               Letzte Synchronisierung: {new Date(lastSync).toLocaleString('de-DE')}
             </p>
           )}
+          <label className="flex items-start gap-3 cursor-pointer text-sm text-[var(--color-text)]">
+            <input
+              type="checkbox"
+              checked={autosync}
+              onChange={(e) => persistAutosync(e.target.checked)}
+              className="mt-1 rounded border-[var(--color-border)]"
+            />
+            <span>
+              <span className="font-medium">Automatisch auf Drive sichern</span>
+              <span className="block text-xs text-[var(--color-text-muted)] mt-1">
+                Nach Änderungen (mit kurzer Verzögerung), kurz nach App-Start und beim Beenden wird der aktuelle
+                Stand hochgeladen. Von Drive laden erfolgt nur manuell und überschreibt lokale Daten.
+              </span>
+            </span>
+          </label>
           <div className="flex flex-wrap gap-2">
             <button
               onClick={handlePush}
@@ -106,7 +138,7 @@ export function DriveSync() {
               {syncing ? 'Lädt...' : 'Auf Drive speichern'}
             </button>
             <button
-              onClick={handlePull}
+              onClick={() => setPullConfirmOpen(true)}
               disabled={syncing}
               className="px-4 py-2 bg-[var(--color-bg-hover)] border border-[var(--color-border)] text-[var(--color-text)] rounded-lg hover:bg-[var(--color-bg)] disabled:opacity-50 transition-colors text-sm"
             >
@@ -120,6 +152,17 @@ export function DriveSync() {
             </button>
           </div>
         </div>
+      )}
+
+      {pullConfirmOpen && (
+        <ConfirmModal
+          title="Von Google Drive laden?"
+          message="Alle lokalen Projekte, Tasks, Sprints und Arbeitsprotokolle werden durch die Kopie aus Google Drive ersetzt. Nicht gesicherte lokale Änderungen gehen verloren. Fortfahren?"
+          confirmLabel="Ja, von Drive laden"
+          danger
+          onConfirm={() => void runPull()}
+          onCancel={() => setPullConfirmOpen(false)}
+        />
       )}
     </section>
   );

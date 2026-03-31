@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Project {
@@ -229,6 +229,8 @@ pub fn save(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
             }
         }
     }
+
+    let _ = app.emit("data-saved", ());
 
     Ok(())
 }

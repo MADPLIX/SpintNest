@@ -9,6 +9,7 @@ import { DailyLog } from './components/DailyLog';
 import { Export } from './components/Export';
 import { Settings } from './components/Settings';
 import { About } from './components/About';
+import { GdriveAutoSync } from './components/GdriveAutoSync';
 import { useStore } from './store/useStore';
 
 function App() {
@@ -16,6 +17,7 @@ function App() {
 
   return (
     <Layout>
+      <GdriveAutoSync />
       {currentView === 'projects' && <Projects />}
       {currentView === 'dashboard' && <Dashboard />}
       {currentView === 'board' && <Board />}
