@@ -1,4 +1,4 @@
-﻿import { listen } from '@tauri-apps/api/event';
+import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import * as gdrive from './gdrive';
 
@@ -34,6 +34,11 @@ async function tryPushQuiet(): Promise<void> {
   }
 }
 
+/** Best-effort Push vor App-Ende; nicht awaiten (Schließen darf nicht hängen). */
+export function exitPushBestEffort(): void {
+  void tryPushQuiet();
+}
+
 function scheduleDebouncedPush(): void {
   if (!isGdriveAutosyncEnabled()) return;
   if (debounceTimer) clearTimeout(debounceTimer);
@@ -58,20 +63,10 @@ export function initGdriveAutoSync(): () => void {
   }, STARTUP_PUSH_MS);
   cleanups.push(() => clearTimeout(startTimer));
 
-  let closingAfterPush = false;
   getCurrentWindow()
-    .onCloseRequested(async (event) => {
-      if (closingAfterPush) return;
-      if (!isGdriveAutosyncEnabled() || !(await gdrive.isConnected())) return;
-      event.preventDefault();
-      try {
-        await gdrive.push();
-        touchLastSync();
-      } catch (e) {
-        console.error('Google Drive push on close:', e);
-      }
-      closingAfterPush = true;
-      await getCurrentWindow().destroy();
+    .onCloseRequested(() => {
+      // Kein preventDefault. Gleicher Pfad wie Titelleiste (tryPushQuiet, nicht blockierend).
+      exitPushBestEffort();
     })
     .then((unlisten) => cleanups.push(unlisten))
     .catch((e) => console.warn('gdrive autosync close:', e));
@@ -84,4 +79,3 @@ export function initGdriveAutoSync(): () => void {
     }
   };
 }
-

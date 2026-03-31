@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { exitPushBestEffort } from '../lib/gdriveAutoSync';
 import { api } from '../api';
 import { useStore } from '../store/useStore';
 import type { Project } from '../types';
@@ -174,7 +175,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
     try { await getCurrentWindow().toggleMaximize(); } catch { /* nicht in Tauri */ }
   }
   async function handleWindowClose() {
-    try { await getCurrentWindow().close(); } catch { /* nicht in Tauri */ }
+    exitPushBestEffort();
+    try {
+      await getCurrentWindow().destroy();
+    } catch {
+      try {
+        await getCurrentWindow().close();
+      } catch {
+        /* nicht in Tauri / Berechtigung fehlt */
+      }
+    }
   }
 
   const selectedProject = projects.find((p) => p.id === selectedProjectId);

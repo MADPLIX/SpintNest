@@ -5,6 +5,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.5.5',
+    items: [
+      'Behebung: App ließ sich nicht schließen, wenn Google-Drive-Autosync das Fenster beim Beenden blockiert hat (Schließen wird nicht mehr abgefangen; Upload beim Beenden nur noch best-effort im Hintergrund)',
+    ],
+  },
+  {
+    version: '0.5.4',
+    items: [
+      'Arbeitsprotokoll: ohne gewähltes Projekt werden keine Einträge mehr aus anderen Projekten angezeigt',
+      'Google Drive: optional automatisch auf Drive sichern (nach Änderungen, kurz nach Start, beim Beenden); manuelles Laden nur mit Bestätigungsdialog',
+    ],
+  },
+  {
     version: '0.4.5',
     items: [
       'Screenshot-Farben aus Zwischenablage werden jetzt korrekt dargestellt',

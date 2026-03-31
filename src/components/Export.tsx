@@ -142,80 +142,107 @@ export function Export() {
       },
     });
 
-    const pageWidth = 210;
-    const pageHeight = 297;
     const margin = 12;
-    const contentWidth = pageWidth - 2 * margin;
-    const imgMaxWidth = contentWidth;
-    const imgMaxHeight = 240;
-    const imgGap = 4;
+    const bottomSafeMm = 16;
+    /** Max. Screenshots pro Seite im 2×2-Raster. */
+    const photosPerPage = 4;
+    /** Abstand zwischen Raster-Zellen (mm). */
+    const gridGapMm = 5;
+    /** Max. Pixelkante fürs Einbetten (jsPDF/riesige Screenshots stabiler). */
+    const maxImagePx = 1600;
 
-    function normalizeImageForPdf(dataUrl: string): Promise<{ w: number; h: number; jpeg: string }> {
+    function normalizeImageForPdf(dataUrl: string): Promise<{ w: number; h: number; canvas: HTMLCanvasElement }> {
       return new Promise((resolve, reject) => {
         const img = new Image();
         img.onload = () => {
+          let tw = img.naturalWidth;
+          let th = img.naturalHeight;
+          if (tw <= 0 || th <= 0) {
+            reject(new Error('Ungültige Bildgröße'));
+            return;
+          }
+          if (tw > maxImagePx || th > maxImagePx) {
+            const r = Math.min(maxImagePx / tw, maxImagePx / th);
+            tw = Math.max(1, Math.round(tw * r));
+            th = Math.max(1, Math.round(th * r));
+          }
           const canvas = document.createElement('canvas');
-          canvas.width = img.naturalWidth;
-          canvas.height = img.naturalHeight;
+          canvas.width = tw;
+          canvas.height = th;
           const ctx = canvas.getContext('2d')!;
           ctx.fillStyle = '#ffffff';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(img, 0, 0);
-          resolve({ w: img.naturalWidth, h: img.naturalHeight, jpeg: canvas.toDataURL('image/jpeg', 0.92) });
+          ctx.fillRect(0, 0, tw, th);
+          ctx.drawImage(img, 0, 0, tw, th);
+          resolve({ w: tw, h: th, canvas });
         };
         img.onerror = reject;
         img.src = dataUrl;
       });
     }
 
-    let y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable?.finalY ?? 28;
-    y += 6;
+    // Nach autoTable auf der letzten Seite der Tabelle zeichnen (jspdf kann sonst auf falscher Seite schreiben).
+    doc.setPage(doc.getNumberOfPages());
 
     for (const l of sortedLogs) {
       const paths = l.screenshot_pfade || [];
       if (paths.length === 0) continue;
 
       const datumFormatted = format(new Date(l.datum + 'T12:00:00'), 'dd. MMMM yyyy', { locale: de });
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'bold');
-      doc.text(`Fotos zum Eintrag vom ${datumFormatted}`, margin, y);
-      y += 5;
 
-      let x = margin;
-      let rowHeight = 0;
-      for (const path of paths) {
-        try {
-          const base64 = await api.readFileBase64(path);
-          const ext = path.split(/[/\\]/).pop()?.toLowerCase()?.split('.').pop() || 'png';
-          const mime = ext === 'jpg' || ext === 'jpeg' ? 'jpeg' : ext === 'webp' ? 'webp' : 'png';
-          const dataUrl = `data:image/${mime};base64,${base64}`;
+      for (let chunkStart = 0; chunkStart < paths.length; chunkStart += photosPerPage) {
+        const chunkPaths = paths.slice(chunkStart, chunkStart + photosPerPage);
+        const images: { canvas: HTMLCanvasElement; w: number; h: number }[] = [];
+        for (const filePath of chunkPaths) {
+          try {
+            const base64 = await api.readFileBase64(filePath);
+            const ext = filePath.split(/[/\\]/).pop()?.toLowerCase()?.split('.').pop() || 'png';
+            const mime = ext === 'jpg' || ext === 'jpeg' ? 'jpeg' : ext === 'webp' ? 'webp' : 'png';
+            const dataUrl = `data:image/${mime};base64,${base64}`;
+            const { w, h, canvas } = await normalizeImageForPdf(dataUrl);
+            if (w > 0 && h > 0) images.push({ canvas, w, h });
+          } catch {
+            // Datei nicht lesbar – überspringen
+          }
+        }
+        if (images.length === 0) continue;
 
-          const { w, h, jpeg } = await normalizeImageForPdf(dataUrl);
-          const scale = Math.min(imgMaxWidth / w, imgMaxHeight / h);
+        // Eigene Seite pro Block; danach aktive Seite = neue Seite (wichtig für jsPDF 4 + korrekte Maße).
+        doc.addPage();
+        const photoPage = doc.getNumberOfPages();
+        doc.setPage(photoPage);
+
+        const pageW = doc.internal.pageSize.getWidth();
+        const pageH = doc.internal.pageSize.getHeight();
+        const contentWidth = pageW - 2 * margin;
+
+        const yTitle = 18;
+        const titleLineMm = 7;
+        const heading =
+          chunkStart === 0
+            ? `Fotos zum Eintrag vom ${datumFormatted}`
+            : `Fotos zum Eintrag vom ${datumFormatted} (Fortsetzung)`;
+
+        const gridTopY = yTitle + titleLineMm;
+        const remainingH = pageH - gridTopY - bottomSafeMm;
+        const cellSide = Math.min((contentWidth - gridGapMm) / 2, (remainingH - gridGapMm) / 2);
+
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.text(heading, margin, yTitle);
+
+        for (let i = 0; i < images.length; i++) {
+          const row = Math.floor(i / 2);
+          const col = i % 2;
+          const { w, h, canvas } = images[i];
+          const cellX = margin + col * (cellSide + gridGapMm);
+          const cellY = gridTopY + row * (cellSide + gridGapMm);
+          const scale = Math.min(cellSide / w, cellSide / h);
           const imgW = w * scale;
           const imgH = h * scale;
-
-          if (x + imgW > pageWidth - margin && x > margin) {
-            x = margin;
-            y += rowHeight + imgGap;
-            rowHeight = 0;
-            if (y + imgH > pageHeight - 20) {
-              doc.addPage();
-              y = 20;
-            }
-          }
-
-          doc.addImage(jpeg, 'JPEG', x, y, imgW, imgH);
-          rowHeight = Math.max(rowHeight, imgH);
-          x += imgW + imgGap;
-        } catch {
-          // Datei nicht lesbar – überspringen
+          const dx = cellX + (cellSide - imgW) / 2;
+          const dy = cellY + (cellSide - imgH) / 2;
+          doc.addImage(canvas, 'JPEG', dx, dy, imgW, imgH, undefined, 'FAST');
         }
-      }
-      y += rowHeight + 8;
-      if (y > pageHeight - 30) {
-        doc.addPage();
-        y = 20;
       }
     }
 
