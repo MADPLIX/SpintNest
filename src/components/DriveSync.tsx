@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
 import * as gdrive from '../lib/gdrive';
 import {
-  GDRIVE_AUTOSYNC_STORAGE_KEY,
+  AUTOSYNC_BLOCKED_HINT_SESSION_KEY,
   isGdriveAutosyncEnabled,
   setGdriveAutosyncEnabled,
 } from '../lib/gdriveAutoSync';
@@ -38,9 +38,6 @@ export function DriveSync() {
     try {
       await gdrive.connect();
       setConnected(true);
-      if (localStorage.getItem(GDRIVE_AUTOSYNC_STORAGE_KEY) === null) {
-        persistAutosync(true);
-      }
       showAlert('Google Drive erfolgreich verbunden!', 'success');
     } catch (e) {
       showAlert('Verbindung fehlgeschlagen: ' + String(e), 'error');
@@ -52,7 +49,8 @@ export function DriveSync() {
   async function handlePush() {
     setSyncing(true);
     try {
-      await gdrive.push();
+      await gdrive.push('manual');
+      sessionStorage.removeItem(AUTOSYNC_BLOCKED_HINT_SESSION_KEY);
       updateLastSync();
       showAlert('Daten auf Google Drive gespeichert.', 'success');
     } catch (e) {
@@ -67,6 +65,7 @@ export function DriveSync() {
     setSyncing(true);
     try {
       await gdrive.pull();
+      sessionStorage.removeItem(AUTOSYNC_BLOCKED_HINT_SESSION_KEY);
       updateLastSync();
       triggerProjectsRefresh();
       showAlert('Daten von Google Drive geladen.', 'success');
@@ -124,8 +123,10 @@ export function DriveSync() {
             <span>
               <span className="font-medium">Automatisch auf Drive sichern</span>
               <span className="block text-xs text-[var(--color-text-muted)] mt-1">
-                Nach Änderungen (mit kurzer Verzögerung), kurz nach App-Start und beim Beenden wird der aktuelle
-                Stand hochgeladen. Von Drive laden erfolgt nur manuell und überschreibt lokale Daten.
+                Lädt nur hoch, wenn auf Google Drive seit dem letzten Laden oder Speichern auf diesem Gerät nichts
+                Neueres liegt (Schutz vor Überschreiben durch ein zweites Gerät). Nach Änderungen mit kurzer
+                Verzögerung, kurz nach Start und beim Beenden. Einmal „Von Drive laden“ setzt den Abgleich auf
+                diesem PC. Manuelles „Auf Drive speichern“ lädt immer hoch.
               </span>
             </span>
           </label>

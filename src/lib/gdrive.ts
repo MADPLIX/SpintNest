@@ -9,6 +9,48 @@ const DRIVE_API = 'https://www.googleapis.com/drive/v3/files';
 const DRIVE_UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files';
 const FILE_NAME = 'sprintnest_data.json';
 
+/** Letzte bekannte modifiedTime der Drive-Datei (nach Pull/Push dieses Geräts). Für Konflikt-Schutz beim Auto-Push. */
+export const GDRIVE_REMOTE_MODIFIED_KEY = 'sn_gdrive_remote_modified';
+
+function getStoredRemoteModified(): string | null {
+  return localStorage.getItem(GDRIVE_REMOTE_MODIFIED_KEY);
+}
+
+function setStoredRemoteModified(iso: string | null): void {
+  if (iso) localStorage.setItem(GDRIVE_REMOTE_MODIFIED_KEY, iso);
+  else localStorage.removeItem(GDRIVE_REMOTE_MODIFIED_KEY);
+}
+
+async function fetchFileModifiedTime(token: string, fileId: string): Promise<string | null> {
+  const res = await fetch(`${DRIVE_API}/${fileId}?fields=modifiedTime`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) return null;
+  const json = (await res.json()) as { modifiedTime?: string };
+  return json.modifiedTime ?? null;
+}
+
+/**
+ * Auto-Push nur, wenn sich auf Drive seit unserem letzten Pull/Push nichts geändert hat
+ * (sonst droht ein anderes Gerät mit neuerem Stand überschrieben zu werden).
+ */
+export async function canAutosyncPush(): Promise<boolean> {
+  if (!(await isConnected())) return false;
+  let token: string;
+  try {
+    token = await getToken();
+  } catch {
+    return false;
+  }
+  const fileId = await findFileId(token);
+  if (!fileId) return true;
+  const remote = await fetchFileModifiedTime(token, fileId);
+  if (!remote) return false;
+  const stored = getStoredRemoteModified();
+  if (!stored) return false;
+  return remote <= stored;
+}
+
 interface TokenStore {
   access_token: string;
   refresh_token: string | null;
@@ -149,24 +191,57 @@ async function createFile(token: string, body: string): Promise<string> {
     },
     body: multipart,
   });
-  const json = await res.json() as { id: string };
+  if (!res.ok) throw new Error(`Drive Upload fehlgeschlagen (${res.status})`);
+  const json = (await res.json()) as { id?: string; modifiedTime?: string };
+  if (!json.id) throw new Error('Drive: keine Datei-ID');
+  const mod = json.modifiedTime ?? (await fetchFileModifiedTime(token, json.id));
+  if (mod) setStoredRemoteModified(mod);
   return json.id;
 }
 
-export async function push(): Promise<void> {
+async function persistRemoteAfterUpload(token: string, fileId: string, patchResponse: Response): Promise<void> {
+  if (patchResponse.ok) {
+    const text = await patchResponse.text();
+    if (text) {
+      try {
+        const j = JSON.parse(text) as { modifiedTime?: string };
+        if (j.modifiedTime) {
+          setStoredRemoteModified(j.modifiedTime);
+          return;
+        }
+      } catch {
+        /* kein JSON */
+      }
+    }
+  }
+  const mod = await fetchFileModifiedTime(token, fileId);
+  if (mod) setStoredRemoteModified(mod);
+}
+
+/**
+ * @param mode `auto` = nur wenn canAutosyncPush (kein Überschreiben neuerer Drive-Version).
+ *            `manual` = immer hochladen (expliziter Klick), danach Baseline aktualisieren.
+ * @returns Bei `auto`: false, wenn wegen Konflikt-Schutz nichts hochgeladen wurde; sonst true.
+ */
+export async function push(mode: 'auto' | 'manual' = 'manual'): Promise<boolean> {
   const token = await getToken();
+  if (mode === 'auto' && !(await canAutosyncPush())) return false;
+
   const bundle = await invoke<string>('get_sync_bundle');
   const fileId = await findFileId(token);
 
   if (fileId) {
-    await fetch(`${DRIVE_UPLOAD}/${fileId}?uploadType=media`, {
+    const patchRes = await fetch(`${DRIVE_UPLOAD}/${fileId}?uploadType=media`, {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: bundle,
     });
+    if (!patchRes.ok) throw new Error(`Drive Upload fehlgeschlagen (${patchRes.status})`);
+    await persistRemoteAfterUpload(token, fileId, patchRes);
   } else {
     await createFile(token, bundle);
   }
+  return true;
 }
 
 export async function pull(): Promise<void> {
@@ -179,10 +254,13 @@ export async function pull(): Promise<void> {
   });
   const bundle = await res.text();
   await invoke('apply_sync_bundle', { bundle });
+  const mod = await fetchFileModifiedTime(token, fileId);
+  if (mod) setStoredRemoteModified(mod);
 }
 
 export async function disconnect(): Promise<void> {
   _cache = null;
   await invoke('clear_gdrive_tokens');
   localStorage.removeItem('sn_gdrive_last_sync');
+  setStoredRemoteModified(null);
 }
